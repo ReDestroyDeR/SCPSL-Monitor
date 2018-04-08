@@ -15,20 +15,14 @@ class Filt(object):
     SERVER = ""
 
     EVENTS = []
+    MULTIACTION = False;
 
     time = 0
-    timex = 0
     event = 0
-    action_x = 0
-    action_y = 0
     action = None
     admin = ""
-    user_x = 0
-    user_y = 0
-    user = "SomeOne"
-    u_x = 0
-    u_y = 0
-    userip = "0.0.0.0"
+    multiuser = []
+    multiuserip = []
 
     def __init__(self, directory, adress):
 
@@ -46,11 +40,11 @@ class Filt(object):
         self.I("Удаление мусора из {}".format(self.WORKING))
         try:
             self.lines = open(self.WORKING, mode='r', encoding='UTF-8').readlines()
-            self.lines = [line.rstrip() for line in self.lines]
+            self.lines = [line.strip("\n") for line in self.lines]
             self.S("...Успешно")
             self.I("Подготовка '{}' для следующего цикла".format(self.WORKING))
             try:
-                #open(self.WORKING, mode='w').close()
+                open(self.WORKING, mode='w').close()
                 self.S("...Успешно")
             except:
                 self.E()
@@ -63,82 +57,91 @@ class Filt(object):
         chest = 0
 
         for event in range(int(len(self.lines))):
-            if event != 0 and chest % 3 == 0:
-                chest = chest + 1
+            if self.lines[event][-2:] == "`%":
                 continue
 
-            chest = 0
-            checker = 0
-            for i in range(len(self.lines[event])):
-                check = self.lines[event][-i:]
-                if i > 1:
-                    check = check[:1]
-                if check == ":":
-                    self.SERVER = self.lines[event][:-i]
+            self.multiuser = []
+            self.multiuserip = []
+            self.time = 0
+            self.event = 0
+            self.action = None
+            self.admin = ""
 
-            for i in range(len(self.lines[event])):
-                check = self.lines[event][-i:]
-                if i > 1:
-                    check = check[:1]
-                if check == ":" and checker == 0:
-                    self.u_x = i
-                    checker = 1
-                if check == "(":
-                    self.admin = self.lines[event][len(self.SERVER)+2:-i]
-                if check == "(" and checker == 1:
-                    self.action_x = i
-                    checker = 2
-                if check == ")":
-                    self.action_y = i
-                if check == ";":
-                    self.u_y = i
-                if check == "{":
-                    self.time = int(self.lines[event][len(self.lines[event])-i+1:-1:])
-                    self.timex = i
+            # Макет действий
+            # SCPSL Community Keter 1: Italian Man Who went to Malta(::ffff:188.168.4.16) FORCECLASS (::ffff:80.253.235.21; ::ffff:46.188.125.52; ::ffff:95.32.34.206; ::ffff:46.219.212.194; ::ffff:178.70.136.112; ::ffff:2.94.255.176; ) {1}
+            # SCPSL Community Keter 1: forced class applied to Alex_STALKER1221
+            # SCPSL Community Keter 1: forced class applied to БУНД БЛЯТЬ
+            # SCPSL Community Keter 1: forced class applied to Zett
+            # SCPSL Community Keter 1: forced class applied to DOCtor
+            # SCPSL Community Keter 1: forced class applied to Lonwrat
+            # SCPSL Community Keter 1: forced class applied to ... а что Титов?
 
-            self.userip = self.lines[event][-self.u_x+1:-self.u_y:]
-            self.action = self.lines[event][-self.action_y+2:-self.action_x-1:]
-            server = self.SERVER
-            suffix = "{} минут".format(self.time)
-            if self.time >= 60:
-                self.time = round(self.time/60)
-                suffix = "{} час(а/ов)".format(self.time)
-                if self.time >= 24:
-                    self.time = round(self.time/24)
-                    suffix = "{} день/дней".format(self.time)
-                    if self.time >= 30:
-                        self.time = round(self.time/30)
-                        suffix ="{} месяц(ев)".format(self.time)
-                        if self.time >= 12:
-                            self.time = round(self.time/12)
-                            suffix = "Пермамент ( {} лет/год(ов) )".format(self.time)
+            # Определение сервера
+            self.SERVER = self.lines[event].split(":")[0]
+            # Определение действия
+            self.action = self.lines[event].\
+                split("::ffff:")[1].split(") ")[1].split(" (")[0]
+            # Определение админа
+            self.admin = self.lines[event].split(": ")[1].split("(::")[0]
+            # Определение IP целей
+            self.multiuserip = self.lines[event].split("(")[2].split(" )")[0].split(";")
+            # Отброс мусора в виде ::ffff:
+            for garbage in range(len(self.multiuserip)):
+                self.multiuserip[garbage] = self.multiuserip[garbage].strip("::ffff:").strip(" ")
+            # Определение аргумента
+            self.time = self.lines[event].split("; ) {")[1].split("}")[0]
+            # Определение целей
+            skip = 1
+            while True:
+                try:
+                    if self.lines[event + skip][-2:] == "`%":
+                        self.multiuser.append(self.lines[event + skip].split(" to ")[1].strip("`%"))
+                        skip += 1
+                    else:
+                        break
+                except:
+                    break
 
             import sender
+            # Определение количества событий за один момент
+            # Если конечно, такие есть
 
+            # Определение пропуска для +1 линии и маски отправки
+            addition = 0
+            mask = ""
             if self.action == "BAN":
-                self.user = self.lines[event + 1][len(self.SERVER)+29:]
-                if len(self.user) > 32:
-                    self.W("Событие номер {} оказалось поврежденным".format(round(event/2)))
-                    self.W("Пропуск")
-                    continue
-                self.I(self.admin+" забанил "+self.user+"("+self.userip+") на сервере "+server+" на "+suffix)
-                sender.Send(self.ADRESS, [self.admin, self.user, self.userip, server, suffix, self.action])
-            if self.action == "FORCECLASS":
-                self.user = self.lines[event + 1][len(self.SERVER)+26:]
-                if len(self.user) > 32:
-                    self.W("Событие номер {} оказалось поврежденным".format(round(event/2)))
-                    self.W("Пропуск")
-                    continue
-                self.I(self.admin + " выдал класс #" + str(self.time) + " игроку " + self.user + "("+self.userip+") на сервере " + server)
-                sender.Send(self.ADRESS, [self.admin, self.user, self.userip, server, self.time, self.action])
-            if self.action == "GIVE":
-                self.user = self.lines[event + 1][len(self.SERVER)+17:]
-                if len(self.user) > 32:
-                    self.W("Событие номер {} оказалось поврежденным".format(round(event/2)))
-                    self.W("Пропуск")
-                    continue
-                self.I(self.admin + " выдал предмет #" + str(self.time) + " игроку " + self.user + "("+self.userip+") на сервере " + server)
-                sender.Send(self.ADRESS, [self.admin, self.user, self.userip, server, self.time, self.action])
+                addition = 27
+                mask = "{} забанил игрока {}({}) на сервере {} время бана {}"
+                suffix = "{} минут".format(self.time)
+                # Определение времени
+                self.time = int(self.time)
+                if self.time >= 60:
+                    self.time = round(self.time / 60)
+                    suffix = "{} час(а/ов)".format(self.time)
+                    if self.time >= 24:
+                        self.time = round(self.time / 24)
+                        suffix = "{} день/дней".format(self.time)
+                        if self.time >= 30:
+                            self.time = round(self.time / 30)
+                            suffix = "{} месяц(ев)".format(self.time)
+                            if self.time >= 12:
+                                self.time = round(self.time / 12)
+                                suffix = "Пермамент ( {} лет/год(ов) )".format(self.time)
+                self.time = suffix
+            elif self.action == "FORCECLASS":
+                addition = 24
+                mask = "{} выдал класс {} игроку {}({}) на сервере {}"
+            elif self.action == "GIVE":
+                addition = 15
+                mask = "{} выдал предмет {} игроку {}({}) на сервере {}"
+
+            # Отправление информации по сокету
+            for item in range(len(self.multiuser)):
+                if self.action == "BAN":
+                    self.I(mask.format(self.admin, self.multiuser[item], self.multiuserip[item], self.SERVER, self.time))
+                else:
+                    self.I(mask.format(self.admin, self.time, self.multiuser[item], self.multiuserip[item], self.SERVER))
+                sender.Send(self.ADRESS, [self.admin, self.multiuser[item], self.multiuserip[item], self.SERVER, self.time, self.action])
 
             sleep(0.5)
             self.event = self.event + 1
@@ -210,3 +213,4 @@ class Filt(object):
 
             else:
                 pass
+
